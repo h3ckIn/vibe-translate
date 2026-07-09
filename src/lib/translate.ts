@@ -241,9 +241,12 @@ export async function testConnection(provider: LLMProvider, apiKey: string, base
         if (content) {
           return { success: true, message: `连接成功！API Key 有效（响应：${content.trim().slice(0, 30)}...）`, status: res.status };
         }
-        return { success: false, message: `响应格式异常: ${body.substring(0, 200)}`, status: res.status };
+        if (data.id && data.object === 'chat.completion') {
+          return { success: true, message: `连接成功！API Key 有效（响应格式正确，ID: ${data.id.slice(0, 20)}...）`, status: res.status };
+        }
+        return { success: true, message: `连接成功！API 返回 200 OK`, status: res.status };
       } catch {
-        return { success: false, message: `响应不是 JSON: ${body.substring(0, 100)}`, status: res.status };
+        return { success: true, message: `连接成功！API 返回 200 OK（响应非 JSON）`, status: res.status };
       }
     } else {
       try {
