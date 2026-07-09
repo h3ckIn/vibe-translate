@@ -95,7 +95,6 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
                   {s.via && <Pill kind={s.via} />}
                   {s.tmHit && <span className="ml-auto text-[10.5px] text-ok">✓ TM 命中</span>}
                 </header>
-                <p className="mt-1.5 text-[12.5px] text-ink/55 leading-relaxed">{s.source}</p>
                 <div className="mt-2 text-[14px] leading-relaxed text-ink whitespace-pre-wrap">
                   {s.status === 'translating' ? (
                     <span className="inline-flex items-center gap-1.5 text-ink/40">
@@ -103,9 +102,9 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
                     </span>
                   ) : s.status === 'error' ? (
                     <ErrorCard msg={s.errorMsg || s.target || ''} hint={s.errorHint} via={s.via} />
-                  ) : (
+                  ) : s.target ? (
                     <>
-                      {s.target || <span className="text-ink/30 italic">等待翻译</span>}
+                      {s.target}
                       {s.via === 'mock' && (
                         <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-canvas text-[10.5px] text-ink/55">
                           <span className="w-1.5 h-1.5 rounded-full bg-warn animate-pulseDot" />
@@ -113,6 +112,8 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
                         </div>
                       )}
                     </>
+                  ) : (
+                    <span className="text-ink/30 italic text-[12.5px]">点击「开始翻译」生成译文</span>
                   )}
                 </div>
               </article>
