@@ -168,7 +168,9 @@ async function callLLM(p: LLMProvider, req: TranslateRequest, text: string): Pro
       throw makeTranslateError(p, res.status, body);
     }
     const data = await res.json();
-    return (data.choices?.[0]?.message?.content || '').trim();
+  // 兼容 OpenAI 标准格式 和 日日新等非标准格式
+  const content = extractContent(data);
+  return content.trim();
   } catch (e) {
     if ((e as Error).name === 'TypeError' && (e as Error).message.includes('fetch')) {
       const netErr = e as TranslateError;
@@ -179,6 +181,35 @@ async function callLLM(p: LLMProvider, req: TranslateRequest, text: string): Pro
     }
     throw e;
   }
+}
+
+function extractContent(data: unknown): string {
+  if (!data || typeof data !== 'object') return '';
+  const d = data as Record<string, unknown>;
+  // OpenAI 标准格式
+  const choices = d.choices;
+  if (Array.isArray(choices) && choices.length > 0) {
+    const first = choices[0];
+    if (first && typeof first === 'object') {
+      if (typeof (first as Record<string, unknown>).text === 'string') {
+        return (first as Record<string, unknown>).text as string;
+      }
+      const message = (first as Record<string, unknown>).message;
+      if (message && typeof message === 'object' && typeof (message as Record<string, unknown>).content === 'string') {
+        return (message as Record<string, unknown>).content as string;
+      }
+    }
+  }
+  // 日日新部分接口可能直接返回 data.content 或 result
+  if (typeof d.content === 'string') return d.content;
+  if (typeof d.result === 'string') return d.result;
+  if (typeof d.output === 'string') return d.output;
+  if (Array.isArray(d.data) && d.data.length > 0 && typeof d.data[0] === 'string') return d.data[0];
+  // 尝试从任意字段找字符串 content
+  for (const key of ['content', 'text', 'output', 'result', 'message', 'response']) {
+    if (typeof d[key] === 'string') return d[key] as string;
+  }
+  return '';
 }
 
 export async function testConnection(provider: LLMProvider, apiKey: string, baseUrl: string, model: string): Promise<{ success: boolean; message: string; status?: number }> {
@@ -206,10 +237,11 @@ export async function testConnection(provider: LLMProvider, apiKey: string, base
     if (res.ok) {
       try {
         const data = JSON.parse(body);
-        if (data.choices?.[0]?.message?.content) {
-          return { success: true, message: '连接成功！API Key 有效', status: res.status };
+        const content = extractContent(data);
+        if (content) {
+          return { success: true, message: `连接成功！API Key 有效（响应：${content.trim().slice(0, 30)}...）`, status: res.status };
         }
-        return { success: false, message: `响应格式异常: ${body.substring(0, 100)}`, status: res.status };
+        return { success: false, message: `响应格式异常: ${body.substring(0, 200)}`, status: res.status };
       } catch {
         return { success: false, message: `响应不是 JSON: ${body.substring(0, 100)}`, status: res.status };
       }
