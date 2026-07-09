@@ -143,19 +143,24 @@ async function callLLM(p: LLMProvider, req: TranslateRequest, text: string): Pro
   const messages = buildMessages(req, text);
 
   // OpenAI / DeepSeek / 豆包 / 日日新：标准 OpenAI 兼容 chat/completions
-  const url = `${req.baseUrl[p]}/chat/completions`;
+  // 通过 Cloudflare Pages Functions 代理，避免 CORS 跨域问题
+  const targetUrl = `${req.baseUrl[p]}/chat/completions`;
+  const url = '/api/llm';
   const model = req.modelMap[p];
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
     },
     body: JSON.stringify({
-      model,
-      messages,
-      temperature: 0.2,
-      stream: false,
+      url: targetUrl,
+      key,
+      payload: {
+        model,
+        messages,
+        temperature: 0.2,
+        stream: false,
+      },
     }),
     signal: req.signal,
   });
