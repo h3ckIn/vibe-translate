@@ -49,7 +49,7 @@ export function makeTranslateError(provider: string, status: number, body: strin
       hint = 'Base URL 或模型名有误，请检查设置。';
     }
   } catch {
-    /* body 不是 JSON */
+    e.message = `${provider}: ${body.substring(0, 200)}`;
   }
   e.hint = hint;
   return e;
@@ -142,34 +142,92 @@ async function callLLM(p: LLMProvider, req: TranslateRequest, text: string): Pro
   if (!key) throw new Error(`${p} API key missing`);
   const messages = buildMessages(req, text);
 
-  // OpenAI / DeepSeek / 豆包 / 日日新：标准 OpenAI 兼容 chat/completions
-  // 通过 Cloudflare Pages Functions 代理，避免 CORS 跨域问题
   const targetUrl = `${req.baseUrl[p]}/chat/completions`;
   const url = '/api/llm';
   const model = req.modelMap[p];
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      url: targetUrl,
-      key,
-      payload: {
-        model,
-        messages,
-        temperature: 0.2,
-        stream: false,
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    }),
-    signal: req.signal,
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw makeTranslateError(p, res.status, body);
+      body: JSON.stringify({
+        url: targetUrl,
+        key,
+        payload: {
+          model,
+          messages,
+          temperature: 0.2,
+          stream: false,
+        },
+      }),
+      signal: req.signal,
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw makeTranslateError(p, res.status, body);
+    }
+    const data = await res.json();
+    return (data.choices?.[0]?.message?.content || '').trim();
+  } catch (e) {
+    if ((e as Error).name === 'TypeError' && (e as Error).message.includes('fetch')) {
+      const netErr = e as TranslateError;
+      netErr.provider = p;
+      netErr.message = `${p}: 网络连接失败 (${(e as Error).message})`;
+      netErr.hint = '请检查网络连接是否正常，或尝试切换到其他 Provider。';
+      throw netErr;
+    }
+    throw e;
   }
-  const data = await res.json();
-  return (data.choices?.[0]?.message?.content || '').trim();
+}
+
+export async function testConnection(provider: LLMProvider, apiKey: string, baseUrl: string, model: string): Promise<{ success: boolean; message: string; status?: number }> {
+  const targetUrl = `${baseUrl}/chat/completions`;
+  const url = '/api/llm';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: targetUrl,
+        key: apiKey,
+        payload: {
+          model,
+          messages: [{ role: 'user', content: 'Hello' }],
+          temperature: 0,
+          max_tokens: 10,
+          stream: false,
+        },
+      }),
+    });
+    const body = await res.text();
+    if (res.ok) {
+      try {
+        const data = JSON.parse(body);
+        if (data.choices?.[0]?.message?.content) {
+          return { success: true, message: '连接成功！API Key 有效', status: res.status };
+        }
+        return { success: false, message: `响应格式异常: ${body.substring(0, 100)}`, status: res.status };
+      } catch {
+        return { success: false, message: `响应不是 JSON: ${body.substring(0, 100)}`, status: res.status };
+      }
+    } else {
+      try {
+        const json = JSON.parse(body);
+        const msg = json?.error?.message || json?.message || body.substring(0, 100);
+        return { success: false, message: `${res.status} - ${msg}`, status: res.status };
+      } catch {
+        return { success: false, message: `${res.status} - ${body.substring(0, 100)}`, status: res.status };
+      }
+    }
+  } catch (e) {
+    if ((e as Error).name === 'TypeError' && (e as Error).message.includes('fetch')) {
+      return { success: false, message: `网络连接失败: ${(e as Error).message}` };
+    }
+    return { success: false, message: `未知错误: ${(e as Error).message}` };
+  }
 }
 
 // Deterministic bilingual mock for demo / offline mode.

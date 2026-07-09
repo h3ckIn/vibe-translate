@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ChevronDown, KeyRound, KeyRound as KeyIcon, Cpu } from 'lucide-react';
+import { ChevronDown, KeyRound, KeyRound as KeyIcon, Cpu, Wifi, WifiOff, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useApp } from '../store/useApp';
 import type { OcrEngine, Provider } from '../lib/types';
+import { testConnection } from '../lib/translate';
 
 const OCR_OPTS: { id: OcrEngine; label: string; needsKey: boolean; keyLabel?: string }[] = [
   { id: 'auto', label: '自动', needsKey: false },
@@ -40,12 +41,39 @@ export function Sidebar() {
   const running = useApp((s) => s.running);
 
   const [showCfg, setShowCfg] = useState(true);
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [testMessage, setTestMessage] = useState('');
   const activeLlm = LLM_CFG.find((c) => c.id === provider) ?? LLM_CFG[0];
   const isOcrProvider = OCR_CFG.some((c) => c.id === provider);
 
   // 当前选中的 OCR 配置
   const activeOcr = OCR_OPTS.find((o) => o.id === ocrEngine) ?? OCR_OPTS[0];
   const ocrKeyProvider = ocrEngine === 'mathpix' ? 'mathpix' : ocrEngine === 'azure' ? 'azure' : ocrEngine === 'aws' ? 'aws' : null;
+
+  const handleTestConnection = async () => {
+    if (isOcrProvider) return;
+    const key = apiKeys[provider];
+    if (!key) {
+      setTestState('error');
+      setTestMessage('请先配置 API Key');
+      return;
+    }
+    setTestState('testing');
+    setTestMessage('正在测试连接...');
+    try {
+      const result = await testConnection(
+        provider as 'openai' | 'deepseek' | 'doubao' | 'sensenova',
+        key,
+        baseUrl[provider as keyof typeof baseUrl] || '',
+        modelMap[provider as keyof typeof modelMap] || ''
+      );
+      setTestState(result.success ? 'success' : 'error');
+      setTestMessage(result.message);
+    } catch (e) {
+      setTestState('error');
+      setTestMessage((e as Error).message || '测试连接失败');
+    }
+  };
 
   return (
     <div className="rounded-2xl border border-rule bg-paper shadow-soft p-4 flex flex-col gap-4">
@@ -158,6 +186,39 @@ export function Sidebar() {
                 <KeyRow label="API Key" value={apiKeys[provider as Provider]} onChange={(v) => setApiKey(provider as Provider, v)} />
                 <UrlRow label="Base URL" value={baseUrl[provider as keyof typeof baseUrl] || ''} onChange={(v) => setBaseUrl(provider as any, v)} />
                 <ModelRow label="模型名" value={modelMap[provider as keyof typeof modelMap] || ''} onChange={(v) => setModel(provider as any, v)} />
+                <button
+                  onClick={handleTestConnection}
+                  disabled={testState === 'testing' || running}
+                  className={`mt-1 h-8 rounded-md text-[11px] font-medium flex items-center justify-center gap-1.5 transition ${
+                    testState === 'testing'
+                      ? 'bg-ink/10 text-ink/40 cursor-not-allowed'
+                      : 'bg-brand-500/10 text-brand-700 hover:bg-brand-500/20 active:bg-brand-500/30'
+                  }`}
+                >
+                  {testState === 'testing' ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      测试中...
+                    </>
+                  ) : (
+                    <>
+                      <Wifi size={12} />
+                      测试连接
+                    </>
+                  )}
+                </button>
+                {testState !== 'idle' && (
+                  <div className={`flex items-start gap-1.5 text-[10px] px-1.5 py-1 rounded ${
+                    testState === 'success' ? 'bg-ok/10 text-ok' : 'bg-warn/10 text-warn'
+                  }`}>
+                    {testState === 'success' ? (
+                      <CheckCircle size={11} className="mt-0.25 shrink-0" />
+                    ) : testState === 'error' ? (
+                      <AlertCircle size={11} className="mt-0.25 shrink-0" />
+                    ) : null}
+                    <span className="leading-relaxed break-all">{testMessage}</span>
+                  </div>
+                )}
               </>
             )}
             <p className="text-[10px] text-ink/40 leading-relaxed">
