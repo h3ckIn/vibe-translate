@@ -87,6 +87,7 @@ interface AppState {
 
   setActiveTask: (t: TaskRecord | null) => void;
   addTask: (t: TaskRecord) => void;
+  updateTask: (t: TaskRecord) => void;
 }
 
 export const useApp = create<AppState>((set, get) => {
@@ -211,6 +212,16 @@ export const useApp = create<AppState>((set, get) => {
       const tasks = [t, ...get().tasks].slice(0, 50);
       set({ tasks });
       saveJSON(NS_TASKS, tasks);
+    },
+    updateTask(t) {
+      const tasks = get().tasks.map((x) => (x.id === t.id ? t : x));
+      set({ tasks });
+      saveJSON(NS_TASKS, tasks);
+      if (get().activeTask?.id === t.id) {
+        set({ activeTask: t });
+        const s = storedRef(get());
+        persist({ ...s, lastTask: t });
+      }
     },
   };
 });

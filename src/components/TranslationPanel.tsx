@@ -30,11 +30,12 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
 
   const onExport = (kind: 'md' | 'json' | 'docx' | 'pdf' | 'pptx') => {
     if (!activeTask) return;
-    if (kind === 'md') exportMarkdown(activeTask);
-    if (kind === 'json') exportJSON(activeTask);
-    if (kind === 'pdf') exportPDF(activeTask);
-    if (kind === 'docx') exportDOCX(activeTask);
-    if (kind === 'pptx') exportPPTX(activeTask);
+    const exportTask = { ...activeTask, segments };
+    if (kind === 'md') exportMarkdown(exportTask);
+    if (kind === 'json') exportJSON(exportTask);
+    if (kind === 'pdf') exportPDF(exportTask);
+    if (kind === 'docx') exportDOCX(exportTask);
+    if (kind === 'pptx') exportPPTX(exportTask);
   };
 
   return (

@@ -23,6 +23,7 @@ export function Workbench() {
   const setProgress = useApp((s) => s.setProgress);
   const setActiveTask = useApp((s) => s.setActiveTask);
   const addTask = useApp((s) => s.addTask);
+  const updateTask = useApp((s) => s.updateTask);
   const addTM = useApp((s) => s.addTM);
   const setView = useApp((s) => s.setView);
 
@@ -156,11 +157,11 @@ export function Workbench() {
     if (newTM.length) addTM(newTM);
     setRunning(false);
     setStatusText(ctrl.signal.aborted ? '已中止' : '翻译完成 ✓');
-    // refresh active task
+    // refresh active task and tasks list
     const cur = useApp.getState().activeTask;
     if (cur) {
       const t: TaskRecord = { ...cur, segments: updated, done: updated.filter((s) => s.status === 'done').length, status: ctrl.signal.aborted ? 'failed' : 'done' };
-      setActiveTask(t);
+      updateTask(t);
     }
   };
 
