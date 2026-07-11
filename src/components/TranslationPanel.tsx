@@ -28,6 +28,8 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
     return items;
   }, [items, filter]);
 
+  const hasTranslations = segments.some((s) => s.target);
+
   const onExport = (kind: 'md' | 'json' | 'docx' | 'pdf' | 'pptx') => {
     if (!activeTask) return;
     const exportTask = { ...activeTask, segments };
@@ -51,11 +53,11 @@ export function TranslationPanel({ onJumpSubtitle }: { onJumpSubtitle?: () => vo
               <Captions size={13} /> 实时字幕
             </button>
           )}
-          <ExportBtn onClick={() => onExport('md')}>MD</ExportBtn>
-          <ExportBtn onClick={() => onExport('json')}>JSON</ExportBtn>
-          <ExportBtn onClick={() => onExport('docx')}>DOCX</ExportBtn>
-          <ExportBtn onClick={() => onExport('pdf')}>PDF</ExportBtn>
-          <ExportBtn onClick={() => onExport('pptx')} primary>
+          <ExportBtn onClick={() => onExport('md')} disabled={!hasTranslations}>MD</ExportBtn>
+          <ExportBtn onClick={() => onExport('json')} disabled={!hasTranslations}>JSON</ExportBtn>
+          <ExportBtn onClick={() => onExport('docx')} disabled={!hasTranslations}>DOCX</ExportBtn>
+          <ExportBtn onClick={() => onExport('pdf')} disabled={!hasTranslations}>PDF</ExportBtn>
+          <ExportBtn onClick={() => onExport('pptx')} primary disabled={!hasTranslations}>
             <FileDown size={12} /> PPTX
           </ExportBtn>
         </div>
@@ -175,13 +177,16 @@ function ErrorCard({ msg, hint, via }: { msg: string; hint?: string; via?: strin
   );
 }
 
-function ExportBtn({ children, onClick, primary }: { children: React.ReactNode; onClick: () => void; primary?: boolean }) {
+function ExportBtn({ children, onClick, primary, disabled }: { children: React.ReactNode; onClick: () => void; primary?: boolean; disabled?: boolean }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       className={
-        'h-8 px-2.5 rounded-lg border text-[11.5px] inline-flex items-center gap-1 ' +
-        (primary
+        'h-8 px-2.5 rounded-lg border text-[11.5px] inline-flex items-center gap-1 transition ' +
+        (disabled
+          ? 'border-rule bg-ink/5 text-ink/30 cursor-not-allowed'
+          : primary
           ? 'border-brand-500 bg-brand-500 text-white hover:bg-brand-600'
           : 'border-rule text-ink/70 hover:bg-canvas')
       }
